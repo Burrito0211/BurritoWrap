@@ -1,7 +1,7 @@
 # 🌯 BurritoWrap
 
 A cross-device online clipboard at **https://wrap.burrito.rip**.
-Copy on one device and paste on another. Clips are end-to-end encrypted in the browser.
+Pick a room number, paste on one device, copy on another.
 
 <p>
   <img src="screenshots/light-desktop-room.png" alt="BurritoWrap on desktop" width="560">
@@ -17,26 +17,24 @@ Copy on one device and paste on another. Clips are end-to-end encrypted in the b
               wrap.burrito.rip
                     │
               Durable Object "Room"
-              (one per pairing code)
+              (one per room number)
 ```
 
-- **One Worker** serves the webpage (`public/`) and handles live connections (`/ws/<room>`).
+- **A room is a number**, 4 to 8 digits, such as `1234`. Every device that opens `wrap.burrito.rip/1234` joins the same room.
+- **One Worker** serves the webpage (`public/`) and handles the live connections (`/ws/1234`).
 - **One Durable Object per room** keeps each device's WebSocket open and relays new clips to the others instantly.
   It keeps the last 20 clips for 24 hours, and wipes a room after a day of no activity.
-- **End-to-end encryption.** The pairing code (`XXXX-XXXX-XXXX`) never leaves the browser.
-  The browser derives two things from it:
-  - `SHA-256(code)` → the **room id**, sent to the server to group devices
-  - `PBKDF2(code)` → an **AES-GCM key**, which encrypts clips before they are sent
-
-  Cloudflare only ever sees the room id and scrambled data.
+- **Rate limiting.** Short numbers are easy to guess, so one visitor can try at most 30 rooms a minute.
+  Anyone who knows a room number can still read that room's clips, so use more digits for anything private.
 
 ## Using it
 
-1. Open wrap.burrito.rip and select **Create a new clipboard**.
-2. On another device, type the pairing code or scan the QR code. The link carries the code after `#`, which browsers never send to the server.
-3. Type or paste text and select **Send**. It shows up on every device in the room. Select **Copy** on a clip to put it on that device's clipboard.
+1. Open wrap.burrito.rip. Type any room number and select **Enter room**, or select **Give me a random room** to get an unused 4-digit number.
+2. On your other devices, open `wrap.burrito.rip/<number>`, type the same number, or scan the QR code.
+3. Type or paste text and select **Send**. It appears on every device in the room. Select **Copy** on a clip to put it on that device's clipboard.
 
 The page remembers your room. Select **Leave** to forget it on that device.
+The button in the bottom-left corner switches between light and dark mode.
 
 ## Deploying (one-time setup)
 
@@ -68,13 +66,14 @@ npm run dev
 ```
 
 Then open http://localhost:8787. Use two browser windows to act as two devices.
+Opening `public/index.html` directly from disk won't work: the page needs the dev server.
 
 ## Files
 
 | Path | What it is |
 |---|---|
-| `wrangler.toml` | Cloudflare config: the domain route, static assets, Durable Object |
+| `wrangler.toml` | Cloudflare config: the domain route, static assets, Durable Object, rate limit |
 | `src/worker.js` | The server: routes requests and runs the `Room` relay |
-| `public/index.html`, `style.css` | The webpage |
-| `public/app.js` | Browser logic: pairing, encryption, WebSocket and reconnecting |
+| `public/index.html`, `style.css` | The webpage, styled after [burrito.rip](https://burrito.rip) |
+| `public/app.js` | Browser logic: room numbers, WebSocket and reconnecting, theme toggle |
 | `public/vendor/qrcode.js` | QR code generator ([qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator), MIT) |

@@ -4,61 +4,78 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BurritoWrap</title>
-  <meta name="description" content="A cross-device clipboard. End-to-end encrypted.">
+  <meta name="description" content="A cross-device clipboard. Pick a room number, paste on one device, copy on another.">
+  <meta name="theme-color" content="#18244a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌯</text></svg>">
+  <!-- Apply the saved theme before first paint so the page doesn't flash -->
+  <script>
+    try { const t = localStorage.getItem("burritowrap:theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <main>
     <header class="top">
-      <h1>🌯 BurritoWrap</h1>
+      <span class="brand">BurritoWrap<span class="dot">.</span></span>
       <span id="status" class="status" hidden></span>
     </header>
 
-    <!-- Start screen: create or join a clipboard -->
+    <!-- Start screen: type a room number, or get a random one -->
     <section id="start" hidden>
-      <p class="lead">Copy on one device, paste on another. Everything is encrypted in your browser before it leaves the device.</p>
-      <button id="create" class="primary big">Create a new clipboard</button>
-      <div class="divider"><span>or join one</span></div>
-      <form id="join-form" class="row">
-        <input id="join-code" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Pairing code">
-        <button type="submit">Join</button>
+      <p class="lead">Copy on one device, paste on another.<br>Open the same room number everywhere.</p>
+
+      <form id="join-form" class="tile join">
+        <label for="join-code" class="label">Room number</label>
+        <input id="join-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="8"
+               placeholder="1234" autocomplete="off" aria-describedby="join-hint">
+        <p id="join-hint" class="hint">4 to 8 digits. Pick any number. If nobody is using it, it's yours.</p>
+        <p id="join-error" class="error" hidden></p>
+        <button type="submit" class="btn primary big"><span aria-hidden="true">▶</span> Enter room</button>
       </form>
-      <p id="join-error" class="error" hidden></p>
+
+      <button id="random" class="btn big">Give me a random room</button>
     </section>
 
     <!-- Room screen -->
     <section id="room" hidden>
-      <div class="pair card">
-        <div>
-          <div class="label">Pairing code</div>
-          <div id="code" class="code"></div>
-          <div class="hint">Type this code or scan the QR code on your other devices.</div>
+      <div class="tile pair">
+        <div class="pair-main">
+          <div class="label">Room</div>
+          <div id="code" class="room-code"></div>
+          <div class="hint">Open <b id="room-link"></b> or scan the QR code on your other devices.</div>
         </div>
         <div class="pair-actions">
-          <button id="show-qr">QR code</button>
-          <button id="copy-link">Copy link</button>
-          <button id="leave" class="ghost">Leave</button>
+          <button id="show-qr" class="btn">QR code</button>
+          <button id="copy-link" class="btn">Copy link</button>
+          <button id="leave" class="btn ghost">Leave</button>
         </div>
         <div id="qr" class="qr" hidden></div>
       </div>
 
-      <form id="send-form" class="card compose">
+      <form id="send-form" class="tile compose">
         <textarea id="text" rows="4" placeholder="Type or paste something…  (Ctrl/⌘ + Enter to send)"></textarea>
         <div class="row end">
-          <button type="button" id="paste">Paste from clipboard</button>
-          <button type="submit" class="primary">Send</button>
+          <button type="button" id="paste" class="btn">Paste from clipboard</button>
+          <button type="submit" class="btn primary">Send</button>
         </div>
       </form>
 
       <div class="list-head">
-        <h2>Recent</h2>
-        <button id="clear" class="ghost small">Clear all</button>
+        <h2 class="section-title">Recent</h2>
+        <button id="clear" class="btn ghost small">Clear all</button>
       </div>
       <ul id="clips" class="clips"></ul>
-      <p id="empty" class="muted">Nothing here yet. Clips are kept for 24 hours.</p>
+      <p id="empty" class="muted">Nothing here yet. Clips disappear after 24 hours.</p>
+      <p class="note">Anyone who knows this room number can see its clips. Use more digits for anything private.</p>
     </section>
   </main>
+
+  <button id="theme-toggle" class="theme-toggle" aria-label="Switch theme">
+    <span class="theme-icon" aria-hidden="true"></span><span class="theme-label"></span>
+  </button>
 
   <div id="toast" class="toast" hidden></div>
 
