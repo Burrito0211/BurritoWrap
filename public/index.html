@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BurritoWrap</title>
+  <meta name="description" content="A cross-device clipboard. End-to-end encrypted.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌯</text></svg>">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header class="top">
+      <h1>🌯 BurritoWrap</h1>
+      <span id="status" class="status" hidden></span>
+    </header>
+
+    <!-- Start screen: create or join a clipboard -->
+    <section id="start" hidden>
+      <p class="lead">Copy on one device, paste on another. Everything is encrypted in your browser before it leaves the device.</p>
+      <button id="create" class="primary big">Create a new clipboard</button>
+      <div class="divider"><span>or join one</span></div>
+      <form id="join-form" class="row">
+        <input id="join-code" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Pairing code">
+        <button type="submit">Join</button>
+      </form>
+      <p id="join-error" class="error" hidden></p>
+    </section>
+
+    <!-- Room screen -->
+    <section id="room" hidden>
+      <div class="pair card">
+        <div>
+          <div class="label">Pairing code</div>
+          <div id="code" class="code"></div>
+          <div class="hint">Type this code or scan the QR code on your other devices.</div>
+        </div>
+        <div class="pair-actions">
+          <button id="show-qr">QR code</button>
+          <button id="copy-link">Copy link</button>
+          <button id="leave" class="ghost">Leave</button>
+        </div>
+        <div id="qr" class="qr" hidden></div>
+      </div>
+
+      <form id="send-form" class="card compose">
+        <textarea id="text" rows="4" placeholder="Type or paste something…  (Ctrl/⌘ + Enter to send)"></textarea>
+        <div class="row end">
+          <button type="button" id="paste">Paste from clipboard</button>
+          <button type="submit" class="primary">Send</button>
+        </div>
+      </form>
+
+      <div class="list-head">
+        <h2>Recent</h2>
+        <button id="clear" class="ghost small">Clear all</button>
+      </div>
+      <ul id="clips" class="clips"></ul>
+      <p id="empty" class="muted">Nothing here yet. Clips are kept for 24 hours.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/vendor/qrcode.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
