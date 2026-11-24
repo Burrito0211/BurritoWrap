@@ -5,6 +5,8 @@
 
 const MIN_LEN = 4;
 const MAX_LEN = 8;
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // must match src/worker.js
+const PREVIEW_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 const ROOM_KEY = "burritowrap:room";
 const THEME_KEY = "burritowrap:theme";
 
@@ -102,6 +104,51 @@ function timeAgo(ts) {
   return Math.floor(s / 3600) + "h ago";
 }
 
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+// ---------- Markdown ----------
+
+marked.setOptions({ gfm: true, breaks: true });
+// Links open in a new tab and can't reach back into this page.
+// Task-list checkboxes (- [ ] item) stay, read-only; any other input is removed.
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node.tagName === "A") {
+    node.setAttribute("target", "_blank");
+    node.setAttribute("rel", "noopener noreferrer");
+  } else if (node.tagName === "INPUT") {
+    if (node.getAttribute("type") === "checkbox") node.setAttribute("disabled", "");
+    else node.remove();
+  }
+});
+
+// Clips come from anyone who knows the room number, so the HTML marked
+// produces is cleaned by DOMPurify before it touches the page. Remote images
+// are blocked too: they could reveal your IP address to whoever posted them.
+function renderMarkdown(text) {
+  return DOMPurify.sanitize(marked.parse(text), { FORBID_TAGS: ["img", "style", "form", "button", "select", "textarea"] });
+}
+
+// ---------- Clip list ----------
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function button(label, className, onclick) {
+  const b = el("button", "btn small " + className, label);
+  b.onclick = onclick;
+  return b;
+}
+
+const fileUrl = (clip) => `/api/rooms/${state.code}/files/${clip.id}`;
+
 function renderClips(newId) {
   const list = $("clips");
   list.textContent = "";
@@ -110,36 +157,125 @@ function renderClips(newId) {
   $("clear").hidden = clips.length === 0;
 
   for (const clip of clips) {
-    const li = document.createElement("li");
-    li.className = "clip" + (clip.id === newId ? " new" : "");
+    const isFile = clip.kind === "file";
+    const li = el("li", "clip" + (isFile ? " file" : "") + (clip.id === newId ? " new" : ""));
+    const actions = el("div", "row");
 
-    const pre = document.createElement("pre");
-    pre.textContent = clip.text; // textContent, never innerHTML: clips are untrusted
-    li.appendChild(pre);
+    if (isFile) {
+      const url = fileUrl(clip);
+      if (PREVIEW_TYPES.has(clip.type)) {
+        const link = el("a", "preview");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        const img = el("img");
+        img.src = url;
+        img.alt = clip.name;
+        img.loading = "lazy";
+        link.appendChild(img);
+        li.appendChild(link);
+        actions.appendChild(button("Copy", "primary", () => copyImage(url)));
+      }
+      const info = el("div", "file-info");
+      info.append(el("span", "file-icon", "▤"), el("span", "file-name", clip.name), el("span", "file-size", formatSize(clip.size)));
+      li.appendChild(info);
+      const dl = el("a", "btn small" + (PREVIEW_TYPES.has(clip.type) ? "" : " primary"), "Download");
+      dl.href = url;
+      dl.download = clip.name;
+      actions.appendChild(dl);
+    } else {
+      const body = el("div", "md");
+      body.innerHTML = renderMarkdown(clip.text);
+      li.appendChild(body);
+      actions.appendChild(button("Copy", "primary", () => copyText(clip.text)));
+    }
 
-    const foot = document.createElement("div");
-    foot.className = "clip-foot";
-    const time = document.createElement("time");
+    actions.appendChild(button("Delete", "ghost", () => send({ type: "delete", id: clip.id })));
+
+    const foot = el("div", "clip-foot");
+    const time = el("time", null, timeAgo(clip.ts));
     time.dataset.ts = clip.ts;
-    time.textContent = timeAgo(clip.ts);
-    foot.appendChild(time);
-
-    const actions = document.createElement("div");
-    actions.className = "row";
-    const copy = document.createElement("button");
-    copy.className = "btn small primary";
-    copy.textContent = "Copy";
-    copy.onclick = () => copyText(clip.text);
-    const del = document.createElement("button");
-    del.className = "btn small ghost";
-    del.textContent = "Delete";
-    del.onclick = () => send({ type: "delete", id: clip.id });
-    actions.append(copy, del);
-    foot.appendChild(actions);
-
+    foot.append(time, actions);
     li.appendChild(foot);
     list.appendChild(li);
   }
+}
+
+// Copy an uploaded image to the clipboard. Browsers only accept PNG here, so
+// other formats are redrawn as PNG first. The ClipboardItem gets a promise so
+// Safari still treats the copy as part of the click.
+async function copyImage(url) {
+  const png = (async () => {
+    const blob = await (await fetch(url)).blob();
+    if (blob.type === "image/png") return blob;
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  })();
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    toast("Image copied!");
+  } catch {
+    toast("This browser can't copy images. Use Download instead.");
+  }
+}
+
+// ---------- Uploads ----------
+
+// Screenshots arrive as "image.png"; give them a useful name instead.
+function nameFor(file) {
+  if (file.name && file.name !== "image.png") return file.name;
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const ext = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+  return `screenshot-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.${ext}`;
+}
+
+function uploadFiles(files) {
+  for (const file of files) uploadFile(file);
+}
+
+// Uses XMLHttpRequest instead of fetch because it reports upload progress.
+function uploadFile(file) {
+  if (!state) return;
+  const name = nameFor(file);
+  if (file.size > MAX_FILE_BYTES) return toast(`${name} is over 10 MB`);
+  if (file.size === 0) return toast(`${name} is empty`);
+
+  const box = $("uploads");
+  const row = el("div", "upload");
+  const label = el("span", "upload-name", name);
+  const bar = el("span", "upload-bar");
+  const fill = el("span", "upload-fill");
+  bar.appendChild(fill);
+  row.append(label, bar);
+  box.appendChild(row);
+  box.hidden = false;
+
+  const done = () => {
+    row.remove();
+    box.hidden = box.childElementCount === 0;
+  };
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", `/api/rooms/${state.code}/files`);
+  xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+  xhr.setRequestHeader("X-File-Name", encodeURIComponent(name));
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) fill.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+  };
+  xhr.onload = () => {
+    done();
+    if (xhr.status >= 300) toast(xhr.responseText || "Upload failed");
+  };
+  xhr.onerror = () => {
+    done();
+    toast("Upload failed. Check your connection.");
+  };
+  xhr.send(file);
 }
 
 setInterval(() => {
@@ -338,17 +474,72 @@ $("text").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("send-form").requestSubmit();
 });
 
+// "Paste from clipboard" sends an image if the clipboard holds one, otherwise text.
 $("paste").onclick = async () => {
   try {
+    if (navigator.clipboard.read) {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) {
+          const blob = await item.getType(type);
+          return uploadFile(new File([blob], "image.png", { type }));
+        }
+      }
+    }
     const text = await navigator.clipboard.readText();
     if (!text) return toast("Clipboard is empty");
     $("text").value = text;
     $("send-form").requestSubmit();
   } catch {
-    toast("Clipboard access blocked. Paste into the box instead.");
+    toast("Clipboard access blocked. Press Ctrl+V instead.");
     $("text").focus();
   }
 };
+
+// Ctrl+V anywhere in a room: files and screenshots upload straight away.
+// Plain text pasted into the box behaves normally; text pasted elsewhere
+// lands in the box so you can check it before sending.
+document.addEventListener("paste", (e) => {
+  if (!state || $("room").hidden) return;
+  const files = [...(e.clipboardData?.files || [])];
+  const text = e.clipboardData?.getData("text/plain") || "";
+  if (files.length && !text) {
+    e.preventDefault();
+    uploadFiles(files);
+  } else if (text && e.target !== $("text") && !(e.target instanceof HTMLInputElement)) {
+    e.preventDefault();
+    $("text").value += text;
+    $("text").focus();
+  }
+});
+
+$("attach").onclick = () => $("file-input").click();
+$("file-input").onchange = (e) => {
+  uploadFiles([...e.target.files]);
+  e.target.value = "";
+};
+
+// Drag files anywhere onto the page.
+let dragDepth = 0;
+const hasFiles = (e) => state && !$("room").hidden && [...(e.dataTransfer?.types || [])].includes("Files");
+window.addEventListener("dragenter", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  $("drop").hidden = false;
+});
+window.addEventListener("dragover", (e) => hasFiles(e) && e.preventDefault());
+window.addEventListener("dragleave", (e) => {
+  if (!hasFiles(e)) return;
+  if (--dragDepth <= 0) { dragDepth = 0; $("drop").hidden = true; }
+});
+window.addEventListener("drop", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  $("drop").hidden = true;
+  uploadFiles([...e.dataTransfer.files]);
+});
 
 $("show-qr").onclick = toggleQR;
 $("copy-link").onclick = () => copyText(shareLink());

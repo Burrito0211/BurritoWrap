@@ -69,10 +69,16 @@
 
       <form id="send-form" class="tile compose">
         <textarea id="text" rows="4" placeholder="Type or paste something…  (Ctrl/⌘ + Enter to send)"></textarea>
+        <p class="compose-hint">
+          <b>Markdown</b> works. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere to send a screenshot or file, or drop files on the page.
+        </p>
         <div class="row end">
+          <input id="file-input" type="file" multiple hidden>
+          <button type="button" id="attach" class="btn">Upload file</button>
           <button type="button" id="paste" class="btn">Paste from clipboard</button>
           <button type="submit" class="btn primary">Send</button>
         </div>
+        <div id="uploads" class="uploads" hidden></div>
       </form>
 
       <div class="list-head">
@@ -96,8 +102,11 @@
   </button>
 
   <div id="toast" class="toast" hidden></div>
+  <div id="drop" class="drop" hidden><div class="drop-box">Drop to send</div></div>
 
   <script src="/vendor/qrcode.js"></script>
+  <script src="/vendor/marked.js"></script>
+  <script src="/vendor/purify.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
