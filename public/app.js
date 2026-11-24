@@ -155,6 +155,7 @@ function renderClips(newId) {
   const clips = [...state.clips.values()].sort((a, b) => b.ts - a.ts);
   $("empty").hidden = clips.length > 0;
   $("clear").hidden = clips.length === 0;
+  $("clip-count").textContent = clips.length ? `(${clips.length})` : "";
 
   for (const clip of clips) {
     const isFile = clip.kind === "file";
@@ -284,13 +285,31 @@ setInterval(() => {
 
 function toggleQR() {
   const box = $("qr");
-  if (!box.hidden) { box.hidden = true; return; }
-  const qr = qrcode(0, "M");
-  qr.addData(shareLink());
-  qr.make();
-  box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
-  box.hidden = false;
+  const open = box.hidden;
+  if (open) {
+    const qr = qrcode(0, "M");
+    qr.addData(shareLink());
+    qr.make();
+    $("qr-code").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+  }
+  box.hidden = !open;
+  $("show-qr").setAttribute("aria-expanded", String(open));
 }
+
+// ---------- Composer folding (remembered per device) ----------
+
+const COMPOSE_KEY = "burritowrap:compose";
+
+function setComposer(open, focus = false) {
+  $("compose-body").hidden = !open;
+  $("compose-toggle").setAttribute("aria-expanded", String(open));
+  $("send-form").classList.toggle("open", open);
+  save(COMPOSE_KEY, open ? "open" : "closed");
+  if (open && focus) $("text").focus();
+}
+
+$("compose-toggle").onclick = () => setComposer($("compose-body").hidden, true);
+setComposer(load(COMPOSE_KEY) === "open");
 
 // ---------- Connection ----------
 
@@ -380,6 +399,8 @@ function enterRoom(code) {
   $("start").hidden = true;
   $("room").hidden = false;
   $("qr").hidden = true;
+  $("show-qr").setAttribute("aria-expanded", "false");
+  $("clip-count").textContent = "";
   $("code").textContent = code;
   $("room-link").textContent = `${location.host}/${code}`;
   $("clips").textContent = "";
@@ -492,7 +513,7 @@ $("paste").onclick = async () => {
     $("send-form").requestSubmit();
   } catch {
     toast("Clipboard access blocked. Press Ctrl+V instead.");
-    $("text").focus();
+    setComposer(true, true);
   }
 };
 
@@ -509,7 +530,7 @@ document.addEventListener("paste", (e) => {
   } else if (text && e.target !== $("text") && !(e.target instanceof HTMLInputElement)) {
     e.preventDefault();
     $("text").value += text;
-    $("text").focus();
+    setComposer(true, true); // unfold so you can check the text before sending
   }
 });
 

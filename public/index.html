@@ -53,36 +53,47 @@
 
     <!-- Room screen -->
     <section id="room" hidden>
-      <div class="tile pair">
-        <div class="pair-main">
-          <div class="label">Room</div>
-          <div id="code" class="room-code"></div>
-          <div class="hint">Open <b id="room-link"></b> or scan the QR code on your other devices.</div>
+      <!-- Slim room bar: number on the left, sharing tools on the right -->
+      <div class="tile roombar">
+        <div class="roombar-id">
+          <span class="label">Room</span>
+          <span id="code" class="room-code"></span>
         </div>
-        <div class="pair-actions">
-          <button id="show-qr" class="btn">QR code</button>
-          <button id="copy-link" class="btn">Copy link</button>
-          <button id="leave" class="btn ghost">Leave</button>
+        <div class="roombar-actions">
+          <button id="show-qr" class="btn small" aria-expanded="false">QR</button>
+          <button id="copy-link" class="btn small">Copy link</button>
+          <button id="leave" class="btn small ghost">Leave</button>
         </div>
-        <div id="qr" class="qr" hidden></div>
+        <div id="qr" class="qr" hidden>
+          <div id="qr-code"></div>
+          <p class="hint">Scan, or open <b id="room-link"></b> on your other devices.</p>
+        </div>
       </div>
 
+      <!-- Composer: folds down to a single row so the clips get the space -->
       <form id="send-form" class="tile compose">
-        <textarea id="text" rows="4" placeholder="Type or paste something…  (Ctrl/⌘ + Enter to send)"></textarea>
-        <p class="compose-hint">
-          <b>Markdown</b> works. Press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere to send a screenshot or file, or drop files on the page.
-        </p>
-        <div class="row end">
-          <input id="file-input" type="file" multiple hidden>
-          <button type="button" id="attach" class="btn">Upload file</button>
-          <button type="button" id="paste" class="btn">Paste from clipboard</button>
-          <button type="submit" class="btn primary">Send</button>
+        <div class="compose-bar">
+          <button type="button" id="compose-toggle" class="compose-toggle" aria-expanded="false" aria-controls="compose-body">
+            <span class="chev" aria-hidden="true">▸</span> Write a clip
+          </button>
+          <div class="compose-quick">
+            <input id="file-input" type="file" multiple hidden>
+            <button type="button" id="attach" class="btn small">Upload file</button>
+            <button type="button" id="paste" class="btn small">Paste</button>
+          </div>
         </div>
+        <div id="compose-body" class="compose-body" hidden>
+          <textarea id="text" rows="4" placeholder="Type something…  Markdown works.  (Ctrl/⌘ + Enter to send)"></textarea>
+          <div class="row end">
+            <button type="submit" class="btn primary">Send</button>
+          </div>
+        </div>
+        <p class="compose-hint"><kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere sends a screenshot or file. You can also drop files on the page.</p>
         <div id="uploads" class="uploads" hidden></div>
       </form>
 
       <div class="list-head">
-        <h2 class="section-title">Recent</h2>
+        <h2 class="section-title">Clips <span id="clip-count" class="count"></span></h2>
         <button id="clear" class="btn ghost small">Clear all</button>
       </div>
       <ul id="clips" class="clips"></ul>
