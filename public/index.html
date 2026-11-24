@@ -3,9 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BurritoWrap</title>
+  <title>BurritoWrap — Burrito</title>
   <meta name="description" content="A cross-device clipboard. Pick a room number, paste on one device, copy on another.">
+  <meta name="author" content="Burrito">
   <meta name="theme-color" content="#18244a">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Burrito">
+  <meta property="og:title" content="BurritoWrap">
+  <meta property="og:description" content="A cross-device clipboard. Pick a room number, paste on one device, copy on another.">
+  <meta property="og:url" content="https://wrap.burrito.rip/">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌯</text></svg>">
   <!-- Apply the saved theme before first paint so the page doesn't flash -->
   <script>
@@ -19,7 +26,12 @@
 <body>
   <main>
     <header class="top">
-      <span class="brand">BurritoWrap<span class="dot">.</span></span>
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <span class="crumb-mark" aria-hidden="true">🐱</span>
+        <a class="crumb-home" href="https://me.burr1to.org" title="Back to me.burr1to.org">Burrito</a>
+        <span class="crumb-divider" aria-hidden="true">/</span>
+        <span class="brand">Wrap<span class="dot">.</span></span>
+      </nav>
       <span id="status" class="status" hidden></span>
     </header>
 
@@ -72,6 +84,12 @@
       <p class="note">Anyone who knows this room number can see its clips. Use more digits for anything private.</p>
     </section>
   </main>
+
+  <footer class="app-footer">
+    <span>Built by <a href="https://me.burr1to.org">Burrito</a></span>
+    <span class="dot" aria-hidden="true">·</span>
+    <span>Clips vanish after 24 hours</span>
+  </footer>
 
   <button id="theme-toggle" class="theme-toggle" aria-label="Switch theme">
     <span class="theme-icon" aria-hidden="true"></span><span class="theme-label"></span>
