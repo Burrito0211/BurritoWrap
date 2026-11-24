@@ -3,8 +3,12 @@ import { DurableObject } from "cloudflare:workers";
 // Limits keep one room from using unbounded storage or bandwidth.
 const MAX_CLIPS = 20; // recent clips kept per room
 const MAX_CLIP_CHARS = 64 * 1024; // max length of one clip
-const CLIP_TTL_MS = 24 * 60 * 60 * 1000; // clips older than this are dropped
-const IDLE_WIPE_MS = 24 * 60 * 60 * 1000; // wipe a room after a day of no activity
+const CLIP_TTL_MS = 24 * 60 * 60 * 1000; // even in a busy room, clips older than this are dropped
+const SAFETY_CHECK_MS = 24 * 60 * 60 * 1000; // re-check an occupied room once a day
+// When the last device leaves, the room waits this long before it is destroyed
+// (with all its clips). The pause covers phones that drop the connection when
+// the screen locks. Set EMPTY_GRACE_SECONDS in wrangler.toml to change it.
+const DEFAULT_GRACE_SECONDS = 60;
 
 // Room numbers are 4 to 8 digits, e.g. 1234.
 const ROOM_CODE = /^\d{4,8}$/;
@@ -51,6 +55,7 @@ export default {
 export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
+    this.graceMs = (Number(env.EMPTY_GRACE_SECONDS) || DEFAULT_GRACE_SECONDS) * 1000;
     // Answer keepalive pings without waking the object up.
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
   }
@@ -66,7 +71,8 @@ export class Room extends DurableObject {
 
     server.send(JSON.stringify({ type: "history", clips: await this.loadClips() }));
     this.broadcastPresence();
-    await this.touch();
+    // Someone is here: cancel any pending destruction.
+    await this.ctx.storage.setAlarm(Date.now() + SAFETY_CHECK_MS);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -94,7 +100,6 @@ export class Room extends DurableObject {
       await this.ctx.storage.put("clips", clips.slice(-MAX_CLIPS));
 
       this.broadcast({ type: "clip", clip });
-      await this.touch();
     } else if (msg.type === "delete") {
       const clips = (await this.loadClips()).filter((c) => c.id !== msg.id);
       await this.ctx.storage.put("clips", clips);
@@ -109,26 +114,40 @@ export class Room extends DurableObject {
     try {
       ws.close(code === 1005 ? 1000 : code, "bye");
     } catch {}
-    this.broadcastPresence(ws);
+    await this.deviceLeft(ws);
   }
 
   async webSocketError(ws) {
-    this.broadcastPresence(ws);
+    await this.deviceLeft(ws);
   }
 
-  // Called after a day without activity: forget everything in this room.
+  async deviceLeft(ws) {
+    this.broadcastPresence(ws);
+    if (this.devices(ws) === 0) {
+      // Last one out: destroy the room unless someone returns within the grace period.
+      await this.ctx.storage.setAlarm(Date.now() + this.graceMs);
+    }
+  }
+
   async alarm() {
-    await this.ctx.storage.deleteAll();
+    if (this.devices() === 0) {
+      // Still empty: destroy the room and every clip in it.
+      await this.ctx.storage.deleteAll();
+    } else {
+      // Occupied: drop clips older than a day and check again tomorrow.
+      await this.ctx.storage.put("clips", await this.loadClips());
+      await this.ctx.storage.setAlarm(Date.now() + SAFETY_CHECK_MS);
+    }
+  }
+
+  devices(leaving) {
+    return this.ctx.getWebSockets().filter((ws) => ws !== leaving).length;
   }
 
   async loadClips() {
     const clips = (await this.ctx.storage.get("clips")) || [];
     const cutoff = Date.now() - CLIP_TTL_MS;
     return clips.filter((c) => c.ts >= cutoff);
-  }
-
-  async touch() {
-    await this.ctx.storage.setAlarm(Date.now() + IDLE_WIPE_MS);
   }
 
   broadcast(msg, except) {
@@ -142,7 +161,6 @@ export class Room extends DurableObject {
   }
 
   broadcastPresence(leaving) {
-    const devices = this.ctx.getWebSockets().filter((ws) => ws !== leaving).length;
-    this.broadcast({ type: "presence", devices }, leaving);
+    this.broadcast({ type: "presence", devices: this.devices(leaving) }, leaving);
   }
 }

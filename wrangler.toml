@@ -9,6 +9,11 @@ routes = [
   { pattern = "wrap.burrito.rip", custom_domain = true }
 ]
 
+[vars]
+# After the last device leaves a room, wait this many seconds before
+# destroying the room and its clips (covers phones locking their screen).
+EMPTY_GRACE_SECONDS = "60"
+
 # Serve the webpage (public/) from the same Worker.
 # Files that exist in public/ are served directly; any other path
 # (e.g. /1234) falls back to index.html. /ws/* and /api/* go to src/worker.js.
