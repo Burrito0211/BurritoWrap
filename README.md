@@ -3,6 +3,11 @@
 A cross-device online clipboard at **https://wrap.burrito.rip**.
 Copy on one device and paste on another. Clips are end-to-end encrypted in the browser.
 
+<p>
+  <img src="screenshots/light-desktop-room.png" alt="BurritoWrap on desktop" width="560">
+  <img src="screenshots/dark-phone-room.png" alt="BurritoWrap on a phone in dark mode" width="200">
+</p>
+
 ## How it works
 
 ```
