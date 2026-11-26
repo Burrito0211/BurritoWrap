@@ -21,7 +21,7 @@ Text supports Markdown, and you can send files and screenshots (press Ctrl+V, or
               (one per room number)
 ```
 
-- **A room is a number**, 4 to 8 digits, such as `1234`. Every device that opens `wrap.burrito.rip/1234` joins the same room.
+- **A room is a 4-digit number**, such as `1234`. Every device that opens `wrap.burrito.rip/1234` joins the same room.
 - **One Worker** serves the webpage (`public/`) and handles the live connections (`/ws/1234`).
 - **One Durable Object per room** keeps each device's WebSocket open and relays new clips to the others instantly.
   It keeps the last 20 clips while the room is in use.
@@ -31,7 +31,7 @@ Text supports Markdown, and you can send files and screenshots (press Ctrl+V, or
 - **Rooms destroy themselves.** When the last device leaves, the room waits 60 seconds (in case a phone just locked its screen), then deletes itself and every clip in it.
   Change the wait with `EMPTY_GRACE_SECONDS` in `wrangler.toml`. In a room that stays busy, clips older than 24 hours are also dropped.
 - **Rate limiting.** Short numbers are easy to guess, so one visitor can try at most 30 rooms a minute.
-  Anyone who knows a room number can still read that room's clips, so use more digits for anything private.
+  Anyone who knows a room number can still read that room's clips, so press **Destroy** when you're done with anything private.
 
 ## Using it
 
