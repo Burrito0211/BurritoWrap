@@ -37,10 +37,11 @@ Text supports Markdown, and you can send files and screenshots (press Ctrl+V, or
 
 1. Open wrap.burrito.rip. Type any room number and select **Enter room**, or select **Give me a random room** to get an unused 4-digit number.
 2. On your other devices, open `wrap.burrito.rip/<number>`, type the same number, or scan the QR code.
-3. Type or paste text and select **Send**. It appears on every device in the room, formatted as Markdown. Select **Copy** on a clip to put the original text on that device's clipboard.
+3. Select **Write a clip**, type or paste text, and press **Enter** (or select **Send**). Use **Shift+Enter** for a new line. On phones, Enter adds a new line and the **Send** button sends. It appears on every device in the room, formatted as Markdown. Select **Copy** on a clip to put the original text on that device's clipboard.
 4. To send a screenshot or file, press **Ctrl+V** anywhere in the room, drag files onto the page, or select **Upload file**. Images can be copied straight back to the clipboard; other files have a **Download** button.
 
 The page remembers your room. Select **Leave** to forget it on that device.
+Select **Destroy** to delete the room and everything in it straight away, on every device. Everyone in the room watches the whole page get rolled up like a burrito, then lands back on the home page.
 The button in the bottom-left corner switches between light and dark mode.
 
 ## Deploying (one-time setup)

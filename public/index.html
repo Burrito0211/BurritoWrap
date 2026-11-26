@@ -63,6 +63,7 @@
           <button id="show-qr" class="btn small" aria-expanded="false">QR</button>
           <button id="copy-link" class="btn small">Copy link</button>
           <button id="leave" class="btn small ghost">Leave</button>
+          <button id="destroy" class="btn small danger" title="Delete this room and everything in it, on every device">Destroy</button>
         </div>
         <div id="qr" class="qr" hidden>
           <div id="qr-code"></div>
@@ -83,8 +84,12 @@
           </div>
         </div>
         <div id="compose-body" class="compose-body" hidden>
-          <textarea id="text" rows="4" placeholder="Type something…  Markdown works.  (Ctrl/⌘ + Enter to send)"></textarea>
-          <div class="row end">
+          <textarea id="text" rows="4" placeholder="Type something…  Markdown works." aria-describedby="keys-hint"></textarea>
+          <div class="compose-send">
+            <p id="keys-hint" class="keys-hint">
+              <span class="keys-desktop"><kbd>Enter</kbd> send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · Markdown works</span>
+              <span class="keys-touch">Tap Send to send · Markdown works</span>
+            </p>
             <button type="submit" class="btn primary">Send</button>
           </div>
         </div>
@@ -113,6 +118,12 @@
   </button>
 
   <div id="toast" class="toast" hidden></div>
+  <!-- "Destroy room" transition: the whole page gets wrapped up like a burrito (see playWrapUp in app.js) -->
+  <div id="wrapup" class="wrapup" hidden role="status">
+    <p class="wrap-text">Room <b id="wrap-code"></b> is wrapped up.</p>
+    <p class="wrap-sub">Every clip and file is gone.</p>
+  </div>
+
   <div id="drop" class="drop" hidden><div class="drop-box">Drop to send</div></div>
 
   <script src="/vendor/qrcode.js"></script>

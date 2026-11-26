@@ -202,6 +202,17 @@ export class Room extends DurableObject {
     } else if (msg.type === "clear") {
       await this.saveClips([], clips);
       this.broadcast({ type: "clear" });
+    } else if (msg.type === "destroy") {
+      // Wipe every clip and file first, then tell every device and hang up.
+      // Anyone who opens this number later gets a brand-new, empty room.
+      await this.ctx.storage.deleteAlarm();
+      await this.ctx.storage.deleteAll();
+      this.broadcast({ type: "destroyed" });
+      for (const socket of this.ctx.getWebSockets()) {
+        try {
+          socket.close(4000, "Room destroyed");
+        } catch {}
+      }
     }
   }
 

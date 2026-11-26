@@ -58,14 +58,47 @@ function load(key) {
 
 // ---------- UI helpers ----------
 
+// Restart a CSS animation class on an element, even if it is already running.
+function replay(node, cls) {
+  if (!node) return;
+  node.classList.remove(cls);
+  void node.offsetWidth; // force a reflow so the animation starts over
+  node.classList.add(cls);
+}
+
 let toastTimer;
 function toast(msg) {
   const el = $("toast");
   el.textContent = msg;
   el.hidden = false;
+  el.classList.remove("out");
+  replay(el, "in");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), 1800);
+  toastTimer = setTimeout(() => {
+    el.classList.add("out"); // slide away, then hide
+    toastTimer = setTimeout(() => { el.hidden = true; el.classList.remove("out"); }, 200);
+  }, 1800);
 }
+
+// Briefly swap a button's label (e.g. "Copy" → "Copied ✓") with a green flash.
+function confirmButton(btn, label) {
+  if (!btn) return;
+  if (btn.dataset.label == null) btn.dataset.label = btn.textContent;
+  btn.textContent = label;
+  btn.classList.add("done");
+  clearTimeout(btn.doneTimer);
+  btn.doneTimer = setTimeout(() => {
+    btn.textContent = btn.dataset.label;
+    delete btn.dataset.label;
+    btn.classList.remove("done");
+  }, 1300);
+}
+
+// Every button gets a little squash-and-bounce when clicked.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest?.("button, a.btn");
+  if (btn && !btn.disabled) replay(btn, "pop");
+});
 
 function setStatus(kind, text) {
   const el = $("status");
@@ -77,9 +110,10 @@ function setStatus(kind, text) {
 function showJoinError(msg) {
   $("join-error").textContent = msg;
   $("join-error").hidden = !msg;
+  if (msg) replay($("join-code"), "shake");
 }
 
-async function copyText(text) {
+async function copyText(text, btn) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
@@ -94,6 +128,7 @@ async function copyText(text) {
     ta.remove();
   }
   toast("Copied!");
+  confirmButton(btn, "Copied ✓");
 }
 
 function timeAgo(ts) {
@@ -149,7 +184,8 @@ function button(label, className, onclick) {
 
 const fileUrl = (clip) => `/api/rooms/${state.code}/files/${clip.id}`;
 
-function renderClips(newId) {
+// `stagger` fades the whole list in one by one (used when a room first loads).
+function renderClips(newId, stagger = false) {
   const list = $("clips");
   list.textContent = "";
   const clips = [...state.clips.values()].sort((a, b) => b.ts - a.ts);
@@ -157,9 +193,10 @@ function renderClips(newId) {
   $("clear").hidden = clips.length === 0;
   $("clip-count").textContent = clips.length ? `(${clips.length})` : "";
 
-  for (const clip of clips) {
+  clips.forEach((clip, i) => {
     const isFile = clip.kind === "file";
-    const li = el("li", "clip" + (isFile ? " file" : "") + (clip.id === newId ? " new" : ""));
+    const li = el("li", "clip" + (isFile ? " file" : "") + (clip.id === newId ? " new" : "") + (stagger ? " enter" : ""));
+    if (stagger) li.style.setProperty("--i", Math.min(i, 10));
     const actions = el("div", "row");
 
     if (isFile) {
@@ -175,7 +212,7 @@ function renderClips(newId) {
         img.loading = "lazy";
         link.appendChild(img);
         li.appendChild(link);
-        actions.appendChild(button("Copy", "primary", () => copyImage(url)));
+        actions.appendChild(button("Copy", "primary", (e) => copyImage(url, e.currentTarget)));
       }
       const info = el("div", "file-info");
       info.append(el("span", "file-icon", "▤"), el("span", "file-name", clip.name), el("span", "file-size", formatSize(clip.size)));
@@ -188,10 +225,14 @@ function renderClips(newId) {
       const body = el("div", "md");
       body.innerHTML = renderMarkdown(clip.text);
       li.appendChild(body);
-      actions.appendChild(button("Copy", "primary", () => copyText(clip.text)));
+      actions.appendChild(button("Copy", "primary", (e) => copyText(clip.text, e.currentTarget)));
     }
 
-    actions.appendChild(button("Delete", "ghost", () => send({ type: "delete", id: clip.id })));
+    // Slide the clip away first, then tell the room to delete it.
+    actions.appendChild(button("Delete", "ghost", () => {
+      li.classList.add("leaving");
+      setTimeout(() => { if (!send({ type: "delete", id: clip.id })) li.classList.remove("leaving"); }, 220);
+    }));
 
     const foot = el("div", "clip-foot");
     const time = el("time", null, timeAgo(clip.ts));
@@ -199,13 +240,13 @@ function renderClips(newId) {
     foot.append(time, actions);
     li.appendChild(foot);
     list.appendChild(li);
-  }
+  });
 }
 
 // Copy an uploaded image to the clipboard. Browsers only accept PNG here, so
 // other formats are redrawn as PNG first. The ClipboardItem gets a promise so
 // Safari still treats the copy as part of the click.
-async function copyImage(url) {
+async function copyImage(url, btn) {
   const png = (async () => {
     const blob = await (await fetch(url)).blob();
     if (blob.type === "image/png") return blob;
@@ -219,6 +260,7 @@ async function copyImage(url) {
   try {
     await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
     toast("Image copied!");
+    confirmButton(btn, "Copied ✓");
   } catch {
     toast("This browser can't copy images. Use Download instead.");
   }
@@ -256,9 +298,15 @@ function uploadFile(file) {
   box.appendChild(row);
   box.hidden = false;
 
-  const done = () => {
-    row.remove();
-    box.hidden = box.childElementCount === 0;
+  const done = (ok) => {
+    const finish = () => {
+      row.remove();
+      box.hidden = box.childElementCount === 0;
+    };
+    if (!ok) return finish();
+    fill.style.width = "100%";
+    row.classList.add("complete"); // flash the bar green, then fade the row out
+    setTimeout(finish, 450);
   };
 
   const xhr = new XMLHttpRequest();
@@ -269,11 +317,11 @@ function uploadFile(file) {
     if (e.lengthComputable) fill.style.width = Math.round((e.loaded / e.total) * 100) + "%";
   };
   xhr.onload = () => {
-    done();
+    done(xhr.status < 300);
     if (xhr.status >= 300) toast(xhr.responseText || "Upload failed");
   };
   xhr.onerror = () => {
-    done();
+    done(false);
     toast("Upload failed. Check your connection.");
   };
   xhr.send(file);
@@ -345,7 +393,7 @@ function connect() {
 
     if (msg.type === "history") {
       s.clips = new Map(msg.clips.map((c) => [c.id, c]));
-      renderClips();
+      renderClips(null, true);
     } else if (msg.type === "clip") {
       s.clips.set(msg.clip.id, msg.clip);
       renderClips(msg.clip.id);
@@ -358,19 +406,116 @@ function connect() {
     } else if (msg.type === "presence") {
       const n = msg.devices;
       setStatus("ok", n === 1 ? "Online · 1 device" : `Online · ${n} devices`);
+    } else if (msg.type === "destroyed") {
+      roomDestroyed(s);
     } else if (msg.type === "error") {
       toast(msg.message);
     }
   };
 
-  ws.onclose = () => {
+  ws.onclose = (e) => {
     clearInterval(s.pingTimer);
     if (s.closed || state !== s) return;
+    if (e.code === 4000) return roomDestroyed(s); // missed the message, but the room is gone
     // Reconnect with backoff: 1s, 2s, 4s … up to 15s
     const delay = Math.min(15000, 1000 * 2 ** s.retry++);
     setStatus("bad", "Offline · retrying");
     setTimeout(connect, delay);
   };
+}
+
+// Someone pressed Destroy: stop reconnecting, play the burrito wrap-up, then go home.
+function roomDestroyed(s) {
+  if (s.closed) return;
+  s.closed = true;
+  clearInterval(s.pingTimer);
+  playWrapUp(s.code, () => { if (state === s) leaveRoom(true); });
+}
+
+// Wrap the whole page up like a burrito. The visible part of the page is the
+// tortilla: it shrinks into a sheet, the left and right sides fold over it,
+// it rolls into a burrito, gets foil on one end, wobbles and zips away.
+const WRAP_MS = 2800;
+
+function playWrapUp(code, then) {
+  const msg = $("wrapup");
+  $("wrap-code").textContent = code;
+  msg.classList.remove("out");
+  msg.hidden = false; // also blocks clicks while the page wraps
+
+  const finish = () => {
+    then();
+    $("start").classList.remove("arrive");
+    if (!$("start").hidden) replay($("start"), "arrive");
+    msg.classList.add("out");
+    setTimeout(() => { msg.hidden = true; msg.classList.remove("out"); }, 300);
+  };
+
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !Element.prototype.animate) {
+    setTimeout(finish, 1500); // just show the message, no motion
+    return;
+  }
+
+  const main = document.querySelector("main");
+  document.body.classList.add("wrapping");
+
+  // Measure the part of the page that's on screen; that's what gets wrapped.
+  const r = main.getBoundingClientRect();
+  const top = Math.max(0, -r.top);
+  const bottom = Math.max(0, r.bottom - innerHeight);
+  const h = r.height - top - bottom;
+  const cx = innerWidth / 2 - r.left;
+  const cy = top + h / 2;
+  const band = Math.min(h * 0.6, r.width * 0.3); // the rolled burrito's thickness
+
+  // Tortilla flaps and foil, laid over the visible part of the page
+  const layer = el("div", "wrap-layer");
+  layer.style.top = top + "px";
+  layer.style.height = h + "px";
+  const left = el("div", "wrap-flap left");
+  const right = el("div", "wrap-flap right");
+  const foil = el("div", "wrap-foil");
+  foil.innerHTML = "WRAP<b>.</b>";
+  foil.style.top = h / 2 - band / 2 + "px";
+  foil.style.height = band + "px";
+  layer.append(left, right, foil);
+  main.appendChild(layer);
+
+  const sheet = `inset(${top}px 0px ${bottom}px 0px round 0px)`;
+  const card = `inset(${top}px 0px ${bottom}px 0px round 28px)`;
+  const rolled = `inset(${cy - band / 2}px 0px ${r.height - cy - band / 2}px 0px round ${band / 2}px)`;
+  const tilt = "scale(0.62) rotate(-12deg)";
+
+  main.style.transformOrigin = `${cx}px ${cy}px`;
+  const anims = [
+    main.animate([
+      { offset: 0,    transform: "none",        clipPath: sheet,  opacity: 1, easing: "cubic-bezier(.3,1.3,.5,1)" },
+      { offset: 0.16, transform: "scale(0.6)",  clipPath: card },                          // page → sheet
+      { offset: 0.32, transform: "scale(0.6)",  clipPath: card,   easing: "cubic-bezier(.5,0,.3,1.3)" },
+      { offset: 0.5,  transform: tilt,          clipPath: rolled },                        // roll up
+      { offset: 0.58, transform: "scale(0.62) rotate(-4deg) translateY(-12px)", clipPath: rolled },
+      { offset: 0.66, transform: "scale(0.62) rotate(-18deg) translateY(-4px)", clipPath: rolled },
+      { offset: 0.74, transform: tilt,          clipPath: rolled },                        // wobble
+      { offset: 0.84, transform: "scale(0.66) rotate(-9deg) translateY(14px)", clipPath: rolled, opacity: 1, easing: "ease-in" },
+      { offset: 1,    transform: "translateY(-75vh) scale(0.08) rotate(25deg)", clipPath: rolled, opacity: 0 },
+    ], { duration: WRAP_MS, fill: "forwards" }),
+    // left side folds over, then the right
+    left.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }],
+      { duration: 260, delay: 450, fill: "forwards", easing: "ease-out" }),
+    right.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }],
+      { duration: 260, delay: 620, fill: "forwards", easing: "ease-out" }),
+    // foil wraps one end once it's rolled
+    foil.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }],
+      { duration: 240, delay: 1420, fill: "forwards", easing: "ease-out" }),
+  ];
+
+  setTimeout(() => {
+    finish(); // switch to the home page first, so the reset is never visible
+    anims.forEach((a) => a.cancel());
+    layer.remove();
+    main.style.transformOrigin = "";
+    document.body.classList.remove("wrapping");
+  }, WRAP_MS + 50);
 }
 
 // Reconnect quickly when a phone comes back from sleep or the network returns.
@@ -402,6 +547,7 @@ function enterRoom(code) {
   $("show-qr").setAttribute("aria-expanded", "false");
   $("clip-count").textContent = "";
   $("code").textContent = code;
+  replay($("code"), "pop-in");
   $("room-link").textContent = `${location.host}/${code}`;
   $("clips").textContent = "";
   $("empty").hidden = false;
@@ -448,6 +594,7 @@ function paintToggle() {
 }
 
 $("theme-toggle").onclick = () => {
+  replay($("theme-toggle").querySelector(".theme-icon"), "spin");
   const next = isNight() ? "light" : "dark";
   document.documentElement.dataset.theme = next;
   save(THEME_KEY, next);
@@ -487,12 +634,29 @@ $("random").onclick = async () => {
 $("send-form").onsubmit = (e) => {
   e.preventDefault();
   const text = $("text").value;
-  if (!text.trim() || !state) return;
-  if (send({ type: "clip", text })) $("text").value = "";
+  if (!text.trim() || !state) {
+    replay($("text"), "shake");
+    return;
+  }
+  if (send({ type: "clip", text })) {
+    $("text").value = "";
+    confirmButton($("send-form").querySelector("[type=submit]"), "Sent ✓");
+  }
 };
 
+// Enter sends, Shift+Enter starts a new line. Phones have no Shift key, so
+// there Enter adds a line and the Send button sends.
+// Enter while an input method (e.g. Chinese/Japanese) is picking characters
+// only confirms the characters, so it never sends.
+const touchOnly = matchMedia("(hover: none) and (pointer: coarse)").matches;
+if (touchOnly) document.documentElement.classList.add("touch");
 $("text").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("send-form").requestSubmit();
+  if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+  const sendKey = e.ctrlKey || e.metaKey || (!e.shiftKey && !e.altKey && !touchOnly);
+  if (sendKey) {
+    e.preventDefault();
+    $("send-form").requestSubmit();
+  }
 });
 
 // "Paste from clipboard" sends an image if the clipboard holds one, otherwise text.
@@ -563,10 +727,22 @@ window.addEventListener("drop", (e) => {
 });
 
 $("show-qr").onclick = toggleQR;
-$("copy-link").onclick = () => copyText(shareLink());
+$("copy-link").onclick = (e) => copyText(shareLink(), e.currentTarget);
 $("leave").onclick = () => leaveRoom(true);
+$("destroy").onclick = () => {
+  if (!state) return;
+  if (confirm(`Destroy room ${state.code}? Every clip and file in it is deleted on every device.`)) send({ type: "destroy" });
+};
 $("clear").onclick = () => {
-  if (confirm("Delete all clips on every device?")) send({ type: "clear" });
+  if (!confirm("Delete all clips on every device?")) return;
+  // Sweep the clips away one after another, then clear the room.
+  document.querySelectorAll("#clips .clip").forEach((li, i) => {
+    li.style.setProperty("--i", Math.min(i, 10));
+    li.classList.add("leaving");
+  });
+  setTimeout(() => {
+    if (!send({ type: "clear" })) document.querySelectorAll("#clips .leaving").forEach((li) => li.classList.remove("leaving"));
+  }, 260);
 };
 
 // Back/forward buttons move between rooms and the start screen.
