@@ -1,0 +1,22 @@
+{
+  "name": "burritowrap",
+  "version": "1.0.0",
+  "description": "A cross-device online clipboard",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Burrito0211/BurritoWrap.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Burrito0211/BurritoWrap/issues"
+  },
+  "homepage": "https://github.com/Burrito0211/BurritoWrap#readme",
+  "devDependencies": {
+    "wrangler": "^4.167.0"
+  },
+  "private": true
+}

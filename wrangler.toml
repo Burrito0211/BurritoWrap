@@ -1,0 +1,41 @@
+name = "burritowrap"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+
+# Your domain is on Cloudflare, so deploying creates the DNS record
+# and HTTPS certificate for this hostname automatically.
+# (Must stay above any [section] header, or TOML puts it inside that section.)
+routes = [
+  { pattern = "wrap.burrito.rip", custom_domain = true }
+]
+
+[vars]
+# After the last device leaves a room, wait this many seconds before
+# destroying the room and its clips (covers phones locking their screen).
+EMPTY_GRACE_SECONDS = "60"
+
+# Serve the webpage (public/) from the same Worker.
+# Files that exist in public/ are served directly; any other path
+# (e.g. /1234) falls back to index.html. /ws/* and /api/* go to src/worker.js.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/ws/*", "/api/*"]
+
+# One Durable Object instance per room number.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# SQLite-backed Durable Objects are available on the free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+# Room numbers are short, so slow down anyone trying lots of them:
+# at most 30 room connections/checks per visitor (IP) per minute.
+[[ratelimits]]
+name = "ROOM_LIMITER"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }

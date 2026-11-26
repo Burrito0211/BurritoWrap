@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BurritoWrap — Burrito</title>
+  <meta name="description" content="A cross-device clipboard. Pick a room number, paste on one device, copy on another.">
+  <meta name="author" content="Burrito">
+  <meta name="theme-color" content="#18244a">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Burrito">
+  <meta property="og:title" content="BurritoWrap">
+  <meta property="og:description" content="A cross-device clipboard. Pick a room number, paste on one device, copy on another.">
+  <meta property="og:url" content="https://wrap.burrito.rip/">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌯</text></svg>">
+  <!-- Apply the saved theme before first paint so the page doesn't flash -->
+  <script>
+    try { const t = localStorage.getItem("burritowrap:theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header class="top">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <span class="crumb-mark" aria-hidden="true">🐱</span>
+        <a class="crumb-home" href="https://me.burr1to.org" title="Back to me.burr1to.org">Burrito</a>
+        <span class="crumb-divider" aria-hidden="true">/</span>
+        <span class="brand">Wrap<span class="dot">.</span></span>
+      </nav>
+      <span id="status" class="status" hidden></span>
+    </header>
+
+    <!-- Start screen: type a room number, or get a random one -->
+    <section id="start" hidden>
+      <p class="lead">Copy on one device, paste on another.<br>Open the same room number everywhere.</p>
+
+      <form id="join-form" class="tile join">
+        <label for="join-code" class="label">Room number</label>
+        <input id="join-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="8"
+               placeholder="1234" autocomplete="off" aria-describedby="join-hint">
+        <p id="join-hint" class="hint">4 to 8 digits. Pick any number. If nobody is using it, it's yours.</p>
+        <p id="join-error" class="error" hidden></p>
+        <button type="submit" class="btn primary big"><span aria-hidden="true">▶</span> Enter room</button>
+      </form>
+
+      <button id="random" class="btn big">Give me a random room</button>
+    </section>
+
+    <!-- Room screen -->
+    <section id="room" hidden>
+      <!-- Slim room bar: number on the left, sharing tools on the right -->
+      <div class="tile roombar">
+        <div class="roombar-id">
+          <span class="label">Room</span>
+          <span id="code" class="room-code"></span>
+        </div>
+        <div class="roombar-actions">
+          <button id="show-qr" class="btn small" aria-expanded="false">QR</button>
+          <button id="copy-link" class="btn small">Copy link</button>
+          <button id="leave" class="btn small ghost">Leave</button>
+          <button id="destroy" class="btn small danger" title="Delete this room and everything in it, on every device">Destroy</button>
+        </div>
+        <div id="qr" class="qr" hidden>
+          <div id="qr-code"></div>
+          <p class="hint">Scan, or open <b id="room-link"></b> on your other devices.</p>
+        </div>
+      </div>
+
+      <!-- Composer: folds down to a single row so the clips get the space -->
+      <form id="send-form" class="tile compose">
+        <div class="compose-bar">
+          <button type="button" id="compose-toggle" class="compose-toggle" aria-expanded="false" aria-controls="compose-body">
+            <span class="chev" aria-hidden="true">▸</span> Write a clip
+          </button>
+          <div class="compose-quick">
+            <input id="file-input" type="file" multiple hidden>
+            <button type="button" id="attach" class="btn small">Upload file</button>
+            <button type="button" id="paste" class="btn small">Paste</button>
+          </div>
+        </div>
+        <div id="compose-body" class="compose-body" hidden>
+          <textarea id="text" rows="4" placeholder="Type something…  Markdown works." aria-describedby="keys-hint"></textarea>
+          <div class="compose-send">
+            <p id="keys-hint" class="keys-hint">
+              <span class="keys-desktop"><kbd>Enter</kbd> send · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · Markdown works</span>
+              <span class="keys-touch">Tap Send to send · Markdown works</span>
+            </p>
+            <button type="submit" class="btn primary">Send</button>
+          </div>
+        </div>
+        <p class="compose-hint"><kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere sends a screenshot or file. You can also drop files on the page.</p>
+        <div id="uploads" class="uploads" hidden></div>
+      </form>
+
+      <div class="list-head">
+        <h2 class="section-title">Clips <span id="clip-count" class="count"></span></h2>
+        <button id="clear" class="btn ghost small">Clear all</button>
+      </div>
+      <ul id="clips" class="clips"></ul>
+      <p id="empty" class="muted">Nothing here yet. Clips disappear once every device has left the room.</p>
+      <p class="note">Anyone who knows this room number can see its clips. Use more digits for anything private.</p>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>Built by <a href="https://me.burr1to.org">Burrito</a></span>
+    <span class="dot" aria-hidden="true">·</span>
+    <span>Clips vanish when everyone leaves</span>
+  </footer>
+
+  <button id="theme-toggle" class="theme-toggle" aria-label="Switch theme">
+    <span class="theme-icon" aria-hidden="true"></span><span class="theme-label"></span>
+  </button>
+
+  <div id="toast" class="toast" hidden></div>
+  <!-- "Destroy room" transition: the whole page gets wrapped up like a burrito (see playWrapUp in app.js) -->
+  <div id="wrapup" class="wrapup" hidden role="status">
+    <p class="wrap-text">Room <b id="wrap-code"></b> is wrapped up.</p>
+    <p class="wrap-sub">Every clip and file is gone.</p>
+  </div>
+
+  <div id="drop" class="drop" hidden><div class="drop-box">Drop to send</div></div>
+
+  <script src="/vendor/qrcode.js"></script>
+  <script src="/vendor/marked.js"></script>
+  <script src="/vendor/purify.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
