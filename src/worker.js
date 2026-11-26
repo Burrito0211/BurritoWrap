@@ -17,8 +17,8 @@ const DEFAULT_GRACE_SECONDS = 60;
 // download, so an uploaded HTML or SVG file can never run as part of this site.
 const PREVIEW_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
-// Room numbers are 4 to 8 digits, e.g. 1234.
-const ROOM_CODE = /^\d{4,8}$/;
+// Room numbers are exactly 4 digits, e.g. 1234.
+const ROOM_CODE = /^\d{4}$/;
 const FILE_ID = /^[0-9a-f-]{36}$/;
 
 export default {
@@ -34,7 +34,7 @@ export default {
     const [, kind, code, fileId] = match;
     const isFiles = url.pathname.includes("/files");
     if (!ROOM_CODE.test(code)) {
-      return new Response("Room numbers are 4 to 8 digits", { status: 400 });
+      return new Response("Room numbers are 4 digits", { status: 400 });
     }
 
     const stub = env.ROOMS.get(env.ROOMS.idFromName(code));

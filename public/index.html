@@ -41,9 +41,9 @@
 
       <form id="join-form" class="tile join">
         <label for="join-code" class="label">Room number</label>
-        <input id="join-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="8"
+        <input id="join-code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="4"
                placeholder="1234" autocomplete="off" aria-describedby="join-hint">
-        <p id="join-hint" class="hint">4 to 8 digits. Pick any number. If nobody is using it, it's yours.</p>
+        <p id="join-hint" class="hint">4 digits. Pick any number. If nobody is using it, it's yours.</p>
         <p id="join-error" class="error" hidden></p>
         <button type="submit" class="btn primary big"><span aria-hidden="true">▶</span> Enter room</button>
       </form>
@@ -103,7 +103,7 @@
       </div>
       <ul id="clips" class="clips"></ul>
       <p id="empty" class="muted">Nothing here yet. Clips disappear once every device has left the room.</p>
-      <p class="note">Anyone who knows this room number can see its clips. Use more digits for anything private.</p>
+      <p class="note">Anyone who knows this room number can see its clips. Press Destroy when you're done with anything private.</p>
     </section>
   </main>
 

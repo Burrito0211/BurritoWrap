@@ -1,10 +1,10 @@
 // BurritoWrap client.
 //
-// A room is just a number (4 to 8 digits). Every device that opens the same
+// A room is just a number (exactly 4 digits). Every device that opens the same
 // number joins the same room: wrap.burrito.rip/1234 → WebSocket /ws/1234.
 
 const MIN_LEN = 4;
-const MAX_LEN = 8;
+const MAX_LEN = 4;
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // must match src/worker.js
 const PREVIEW_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 const ROOM_KEY = "burritowrap:room";
@@ -16,7 +16,7 @@ let state = null; // { code, ws, clips: Map, retry, pingTimer, closed }
 
 // ---------- Room numbers ----------
 
-// "12 34" → "1234"; returns null unless it is 4–8 digits.
+// "12 34" → "1234"; returns null unless it is exactly 4 digits.
 function normalizeCode(input) {
   const s = String(input || "").replace(/\D/g, "");
   return s.length >= MIN_LEN && s.length <= MAX_LEN ? s : null;
@@ -35,13 +35,13 @@ async function roomInUse(code) {
   return (await res.json()).inUse;
 }
 
-// Pick a random 4-digit room nobody is using (5 digits if we're unlucky).
+// Pick a random 4-digit room nobody is using.
 async function pickFreeRoom() {
-  for (let i = 0; i < 8; i++) {
-    const code = randomDigits(i < 5 ? 4 : 5);
+  for (let i = 0; i < 6; i++) {
+    const code = randomDigits(4);
     if (!(await roomInUse(code))) return code;
   }
-  return randomDigits(6);
+  throw new Error("Couldn't find a free room. Try again, or type a number.");
 }
 
 const roomFromPath = () => normalizeCode(location.pathname.slice(1));
@@ -613,7 +613,7 @@ $("join-code").addEventListener("input", (e) => {
 $("join-form").onsubmit = (e) => {
   e.preventDefault();
   const code = normalizeCode($("join-code").value);
-  if (!code) return showJoinError(`Room numbers are ${MIN_LEN} to ${MAX_LEN} digits.`);
+  if (!code) return showJoinError(`Room numbers are ${MAX_LEN} digits.`);
   $("join-code").value = "";
   enterRoom(code);
 };
